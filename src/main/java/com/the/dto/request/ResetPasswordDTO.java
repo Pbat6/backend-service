@@ -7,7 +7,7 @@ import lombok.Getter;
 public class ResetPasswordDTO {
 
     @NotBlank(message = "secretKey must be not blank")
-    private String secretKey;
+    private String resetToken;
 
     @NotBlank(message = "password must be not blank")
     private String password;

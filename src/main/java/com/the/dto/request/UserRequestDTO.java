@@ -55,9 +55,6 @@ public class UserRequestDTO implements Serializable {
     @EnumValue(name = "type", enumClass = UserType.class)
     private String type;
 
-    @NotEmpty(message = "addresses can not empty")
-    private Set<AddressDTO> addresses;
-
     @EnumPattern(name = "status", regexp = "ACTIVE|INACTIVE|NONE")
     private UserStatus status;
 

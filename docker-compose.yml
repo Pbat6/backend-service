@@ -1,11 +1,12 @@
 services:
   postgres:
-    image: postgres
-    container_name: postgres:15
+    image: postgres:15
+    container_name: postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
+      POSTGRES_DB: user_service_db
       PGDATA: /data/postgres
     volumes:
       - postgres:/data/postgres
@@ -34,6 +35,8 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - '22181:2181'
+    networks:
+      - backend
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -49,14 +52,15 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - backend
 
 #  init-kafka-container:
 #    image: confluentinc/cp-kafka:latest
 #    depends_on:
 #      - kafka
 #    entrypoint: [ '/bin/sh', '-c' ]
-#    command: |
-#      "
+#    command: >
 #      # rather than giving sleep 15 use this
 #      # to block init container to wait for Kafka broker to be ready
 #      kafka-topics --bootstrap-server kafka:9092 --list
@@ -65,7 +69,7 @@ services:
 #      kafka-topics --create --partitions 3 --bootstrap-server kafka:9092 --topic input
 #      kafka-topics --create --bootstrap-server kafka:9092 --partitions 1 --topic output
 
-  api-service:
+  user-service:
     container_name: user-service
     build:
       context: ./

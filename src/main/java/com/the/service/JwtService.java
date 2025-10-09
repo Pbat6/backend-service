@@ -4,11 +4,14 @@ import com.the.util.TokenType;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
+
 @Service
 public interface JwtService {
-    String extractUserName(String token);
 
-    String generateToken(UserDetails userDetails);
+    Date extractExpiration(String token, TokenType type);
+
+    String generateAccessToken(UserDetails userDetails);
 
     String generateRefreshToken(UserDetails user);
 
@@ -16,5 +19,5 @@ public interface JwtService {
 
     String extractUsername(String token, TokenType type);
 
-    boolean isValid(String token, TokenType type, UserDetails user);
+    boolean isTokenExpired(String token, TokenType type);
 }

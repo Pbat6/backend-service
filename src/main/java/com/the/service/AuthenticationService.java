@@ -1,28 +1,33 @@
 package com.the.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.the.dto.request.ChangePasswordDTO;
 import com.the.dto.request.ResetPasswordDTO;
+import com.the.dto.request.ResetPasswordEvent;
 import com.the.dto.request.SignInRequest;
-import com.the.dto.response.SignInResponse;
 import com.the.dto.response.TokenResponse;
+import com.the.exception.BadCredentialsException;
 import com.the.exception.InvalidDataException;
 import com.the.model.RedisToken;
 import com.the.model.User;
 import com.the.repository.UserRepository;
+import com.the.util.CookieUtil;
 import com.the.util.TokenType;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.http.HttpHeaders;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
+import java.util.Date;
 
 @Service
 @RequiredArgsConstructor
@@ -34,57 +39,30 @@ public class AuthenticationService {
     private final JwtService jwtService;
     private final RedisTokenService redisTokenService;
     private final PasswordEncoder passwordEncoder;
-    private final TokenService tokenService;
     private final UserService userService;
+    private final CookieUtil cookieUtil;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    /**
-     * Sign in the system
-     * @param request
-     * @return
-     */
-    public SignInResponse signIn(SignInRequest request) {
-        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
-        var user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
-        var accessToken = jwtService.generateToken(user);
-        return SignInResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken("refresh_token")
-                .userId(1L)
-                .phoneNumber("phoneNumber")
-                .role("ROLE_USER")
-                .build();
-    }
+    @Value("${jwt.expiryMinute}")
+    private Integer expiryMinute;
 
-
-
-    public TokenResponse accessToken(SignInRequest signInRequest) {
+    public TokenResponse signIn(SignInRequest signInRequest, HttpServletResponse response) {
         log.info("---------- accessToken ----------");
-
-        var user = userService.getByUsername(signInRequest.getUsername());
+        User user = userService.getByUsername(signInRequest.getUsername());
         if (!user.isEnabled()) {
             throw new InvalidDataException("User not active");
         }
-
-        List<String> roles = userService.getAllRolesByUserId(user.getId());
-        List<SimpleGrantedAuthority> authorities = roles.stream().map(SimpleGrantedAuthority::new).toList();
-
-        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(signInRequest.getUsername(), signInRequest.getPassword(), authorities));
-
+        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(signInRequest.getUsername(), signInRequest.getPassword()));
         // create new access token
-        String accessToken = jwtService.generateToken(user);
-
+        String accessToken = jwtService.generateAccessToken(user);
         // create new refresh token
         String refreshToken = jwtService.generateRefreshToken(user);
-
-        // save token to db
-        // tokenService.save(Token.builder().username(user.getUsername()).accessToken(accessToken).refreshToken(refreshToken).build());
-        redisTokenService.save(RedisToken.builder().id(user.getUsername()).accessToken(accessToken).refreshToken(refreshToken).build());
-
+        redisTokenService.save(RedisToken.builder().id(user.getUsername()).refreshToken(refreshToken).build());
+        cookieUtil.create(response, "refreshToken", refreshToken, expiryMinute);
         return TokenResponse.builder()
                 .accessToken(accessToken)
-                .refreshToken(refreshToken)
                 .userId(user.getId())
+                .roles(user.getRoles().stream().map(uhr -> uhr.getRole().getName()).toList())
                 .build();
     }
 
@@ -96,28 +74,13 @@ public class AuthenticationService {
      */
     public TokenResponse refreshToken(HttpServletRequest request) {
         log.info("---------- refreshToken ----------");
-
-        final String refreshToken = request.getHeader(HttpHeaders.REFERER);
-        if (StringUtils.isBlank(refreshToken)) {
-            throw new InvalidDataException("Token must be not blank");
-        }
-        final String userName = jwtService.extractUsername(refreshToken, TokenType.REFRESH_TOKEN);
-        var user = userService.getByUsername(userName);
-        if (!jwtService.isValid(refreshToken, TokenType.REFRESH_TOKEN, user)) {
-            throw new InvalidDataException("Not allow access with this token");
-        }
-
+        User user = validateAndGetUserFromRefreshToken(request);
         // create new access token
-        String accessToken = jwtService.generateToken(user);
-
-        // save token to db
-        // tokenService.save(Token.builder().username(user.getUsername()).accessToken(accessToken).refreshToken(refreshToken).build());
-        redisTokenService.save(RedisToken.builder().id(user.getUsername()).accessToken(accessToken).refreshToken(refreshToken).build());
-
+        String accessToken = jwtService.generateAccessToken(user);
         return TokenResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
                 .userId(user.getId())
+                .accessToken(accessToken)
+                .roles(user.getRoles().stream().map(uhr -> uhr.getRole().getName()).toList())
                 .build();
     }
 
@@ -127,20 +90,34 @@ public class AuthenticationService {
      * @param request
      * @return
      */
-    public String removeToken(HttpServletRequest request) {
-        log.info("---------- removeToken ----------");
+    public void removeToken(HttpServletRequest request, HttpServletResponse response) {
+        final String authHeader = request.getHeader("Authorization");
 
-        final String token = request.getHeader(HttpHeaders.REFERER);
-        if (StringUtils.isBlank(token)) {
-            throw new InvalidDataException("Token must be not blank");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            User user = validateAndGetUserFromRefreshToken(request);
+            redisTokenService.remove(user.getUsername());
+            cookieUtil.clear(response, "refreshToken");
+        }else{
+            final String accessToken = authHeader.substring(7);
+
+            try {
+                Date expirationDate = jwtService.extractExpiration(accessToken, TokenType.ACCESS_TOKEN);
+
+                // 2. Tính thời gian còn lại của token
+                long remainingTime = expirationDate.getTime() - System.currentTimeMillis();
+
+                // 3. Thêm token vào blacklist
+                redisTokenService.blacklistToken(accessToken, remainingTime);
+
+                User user = validateAndGetUserFromRefreshToken(request);
+                redisTokenService.remove(user.getUsername());
+                cookieUtil.clear(response, "refreshToken");
+
+            } catch (Exception e) {
+                // Có thể token đã hết hạn hoặc không hợp lệ, không cần làm gì thêm
+                log.error("Error while blacklisting token: {}", e.getMessage());
+            }
         }
-
-        final String userName = jwtService.extractUsername(token, TokenType.ACCESS_TOKEN);
-
-        // tokenService.delete(userName);
-        redisTokenService.remove(userName);
-
-        return "Removed!";
     }
 
     /**
@@ -148,83 +125,76 @@ public class AuthenticationService {
      *
      * @param email
      */
-    public String forgotPassword(String email) {
-        log.info("---------- forgotPassword ----------");
-
-        // check email exists or not
-        User user = userService.getUserByEmail(email);
-
-        // generate reset token
-        String resetToken = jwtService.generateResetToken(user);
-
-        // save to db
-        // tokenService.save(Token.builder().username(user.getUsername()).resetToken(resetToken).build());
-        redisTokenService.save(RedisToken.builder().id(user.getUsername()).resetToken(resetToken).build());
-
-        // TODO send email to user
-        String confirmLink = String.format("curl --location 'http://localhost:80/auth/reset-password' \\\n" +
-                "--header 'accept: */*' \\\n" +
-                "--header 'Content-Type: application/json' \\\n" +
-                "--data '%s'", resetToken);
-        log.info("--> confirmLink: {}", confirmLink);
-
-        return resetToken;
+    public void forgotPassword(String email) {
+        try{
+            log.info("---------- forgotPassword ----------");
+            // check email exists or not
+            User user = userService.getUserByEmail(email);
+            // generate reset token
+            String resetToken = jwtService.generateResetToken(user);
+            redisTokenService.save(RedisToken.builder().id(user.getUsername()).resetToken(resetToken).build());
+            ResetPasswordEvent event = new ResetPasswordEvent(user.getEmail(), user.getUsername(), resetToken, "reset");
+            // publish reset password event to Kafka
+//            String message = String.format("email=%s,username=%s,resetToken=%s,type=reset", user.getEmail(), user.getUsername(), resetToken);
+            kafkaTemplate.send("reset-password-topic", event);
+        }catch (Exception e){
+            log.error("Exception occurred in forgotPassword for email {}", email, e);
+        }
     }
 
     /**
      * Reset password
      *
-     * @param secretKey
+     * @param resetPasswordDTO
      * @return
      */
-    public String resetPassword(String secretKey) {
+    public void resetPassword(ResetPasswordDTO resetPasswordDTO) {
         log.info("---------- resetPassword ----------");
-
-        // validate token
-        var user = validateToken(secretKey);
-
-        // check token by username
-        tokenService.getByUsername(user.getUsername());
-
-        return "Reset";
-    }
-
-    public String changePassword(ResetPasswordDTO request) {
-        log.info("---------- changePassword ----------");
-
-        if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new InvalidDataException("Passwords do not match");
+        if (!resetPasswordDTO.getPassword().equals(resetPasswordDTO.getConfirmPassword())) {
+            throw new InvalidDataException("Passwords do not match. Please ensure both password fields are identical.");
         }
-
-        // get user by reset token
-        var user = validateToken(request.getSecretKey());
-
-        // update password
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        userService.saveUser(user);
-
-        return "Changed";
-    }
-
-    /**
-     * Validate user and reset token
-     *
-     * @param token
-     * @return
-     */
-    private User validateToken(String token) {
-        // validate token
-        var userName = jwtService.extractUsername(token, TokenType.RESET_TOKEN);
-
-        // check token in redis
-        redisTokenService.isExists(userName);
-
-        // validate user is active or not
-        var user = userService.getByUsername(userName);
+        String resetToken = resetPasswordDTO.getResetToken();
+        String username = jwtService.extractUsername(resetToken, TokenType.RESET_TOKEN);
+        jwtService.isTokenExpired(resetToken, TokenType.RESET_TOKEN);
+        String tokenInRedis = redisTokenService.get(username).getResetToken();
+        if (StringUtils.isEmpty(tokenInRedis) || !tokenInRedis.equals(resetToken)) {
+            throw new InvalidDataException("Invalid or expired reset token. Please request a new one.");
+        }
+        User user = userService.getByUsername(username);
         if (!user.isEnabled()) {
-            throw new InvalidDataException("User not active");
+            throw new InvalidDataException("User account is not active.");
         }
+        user.setPassword(passwordEncoder.encode(resetPasswordDTO.getPassword()));
+        userRepository.save(user);
+        // 6. Xóa token khỏi Redis sau khi đã sử dụng xong
+        redisTokenService.remove(username);
+        log.info("Password has been successfully reset for user: {}", username);
+    }
 
-        return user;
+    public void changePassword(ChangePasswordDTO request) {
+        log.info("---------- changePassword ----------");
+        if (!request.getNewPassword().equals(request.getConfirmNewPassword())) {
+            throw new InvalidDataException("New password and confirmation password do not match.");
+        }
+        // Lấy thông tin người dùng đang được xác thực từ Security Context
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userService.getByUsername(username);
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            throw new BadCredentialsException("Incorrect old password.");
+        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+    }
+
+    private User validateAndGetUserFromRefreshToken(HttpServletRequest request) {
+        String refreshToken = cookieUtil.get(request, "refreshToken").orElseThrow(() -> new InvalidDataException("Refresh token not found or invalid"));
+        String username = jwtService.extractUsername(refreshToken, TokenType.REFRESH_TOKEN);
+        jwtService.isTokenExpired(refreshToken, TokenType.REFRESH_TOKEN);
+        String tokenInRedis = redisTokenService.get(username).getRefreshToken();
+        if (!tokenInRedis.equals(refreshToken)) {
+            throw new InvalidDataException("Invalid Refresh Token");
+        }
+        return userService.getByUsername(username);
     }
 }

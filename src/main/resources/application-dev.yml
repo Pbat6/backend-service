@@ -11,7 +11,7 @@ spring:
   jpa:
     show-sql: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
   redis:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
@@ -19,7 +19,7 @@ spring:
     bootstrap-servers: localhost:29092
 
 endpoint:
-  confirmUser: http://localhost:${server.port}/user/confirm
+  resetPassword: http://localhost:3000/reset-password
 
 springdoc:
   api-docs:
@@ -34,6 +34,7 @@ openapi:
     version: 1.0.0
 
 jwt:
+  expiryMinute: 10
   expiryHour: 1
   expiryDay: 14
   accessKey: c2VjcmV0QGtleS5hcGlfaGFzX2JlZW5fZGVzaWduZWRfYnlfVGF5TFE=

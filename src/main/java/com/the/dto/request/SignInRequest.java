@@ -16,12 +16,4 @@ public class SignInRequest implements Serializable {
 
     @NotBlank(message = "password must be not blank")
     private String password;
-
-    @NotNull(message = "platform must be not null")
-    private Platform platform;
-
-    private String version;
-
-    private String deviceToken;
-
 }

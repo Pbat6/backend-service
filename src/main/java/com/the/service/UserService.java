@@ -21,10 +21,6 @@ public interface UserService {
 
     void updateUser(long userId, UserRequestDTO request);
 
-    void changeStatus(long userId, UserStatus status);
-
-    String confirmUser(int userId, String verifyCode);
-
     void deleteUser(long userId);
 
     UserDetailResponse getUser(long userId);

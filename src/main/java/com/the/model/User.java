@@ -53,40 +53,16 @@ public class User extends AbstractEntity<Long> implements UserDetails {
     @Column(name = "password")
     private String password;
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "type")
-    private UserType type;
+    @Column(name = "city")
+    private String city;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "status")
     private UserStatus status;
 
-    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY, mappedBy = "user")
-    private Set<Address> addresses = new HashSet<>();
-
-    @OneToMany(mappedBy = "user")
+    @OneToMany(mappedBy = "user", fetch = FetchType.EAGER)
     private Set<UserHasRole> roles = new HashSet<>();
-
-    @OneToMany(mappedBy = "user")
-    private Set<GroupHasUser> groups = new HashSet<>();
-
-    public void saveAddress(Address address) {
-        if (address != null) {
-            if (addresses == null) {
-                addresses = new HashSet<>();
-            }
-            addresses.add(address);
-            address.setUser(this); // save user_id
-        }
-    }
-
-    // https://stackoverflow.com/questions/56899986/why-infinite-loop-hibernate-when-load-data
-    @JsonIgnore // Stop infinite loop
-    public Set<Address> getAddresses() {
-        return addresses;
-    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -100,7 +76,7 @@ public class User extends AbstractEntity<Long> implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return UserStatus.ACTIVE.equals(status);
+        return true;
     }
 
     @Override
@@ -110,6 +86,6 @@ public class User extends AbstractEntity<Long> implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return UserStatus.ACTIVE.equals(status);
     }
 }

@@ -14,12 +14,10 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import com.the.dto.request.AddressDTO;
 import com.the.dto.request.UserRequestDTO;
 import com.the.dto.response.PageResponse;
 import com.the.dto.response.UserDetailResponse;
 import com.the.exception.ResourceNotFoundException;
-import com.the.model.Address;
 import com.the.model.User;
 import com.the.repository.SearchRepository;
 import com.the.repository.UserRepository;
@@ -46,7 +44,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final SearchRepository searchRepository;
     private final MailService mailService;
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @Override
     public UserDetailsService userDetailsService() {
@@ -67,28 +65,16 @@ public class UserServiceImpl implements UserService {
                 .username(request.getUsername())
                 .password(request.getPassword())
                 .status(request.getStatus())
-                .type(UserType.valueOf(request.getType().toUpperCase()))
                 .build();
-        request.getAddresses().forEach(a ->
-                user.saveAddress(Address.builder()
-                        .apartmentNumber(a.getApartmentNumber())
-                        .floor(a.getFloor())
-                        .building(a.getBuilding())
-                        .streetNumber(a.getStreetNumber())
-                        .street(a.getStreet())
-                        .city(a.getCity())
-                        .country(a.getCountry())
-                        .addressType(a.getAddressType())
-                        .build()));
 
         User result = userRepository.save(user);
 
         log.info("User has saved!");
 
-        if (result != null) {
-            // mailService.sendConfirmLink(user.getEmail(), user.getId(), "code@123");
-            kafkaTemplate.send("confirm-account-topic", String.format("email=%s,id=%s,code=%s", user.getEmail(), user.getId(), "code@123"));
-        }
+//        if (result != null) {
+//            // mailService.sendConfirmLink(user.getEmail(), user.getId(), "code@123");
+//            kafkaTemplate.send("confirm-account-topic", String.format("email=%s,id=%s,code=%s", user.getEmail(), user.getId(), "code@123"));
+//        }
 
         return user.getId();
     }
@@ -108,17 +94,11 @@ public class UserServiceImpl implements UserService {
         user.setUsername(request.getUsername());
         user.setPassword(request.getPassword());
         user.setStatus(request.getStatus());
-        user.setType(UserType.valueOf(request.getType().toUpperCase()));
-        user.setAddresses(convertToAddress(request.getAddresses()));
         userRepository.save(user);
 
         log.info("User updated successfully");
     }
 
-    @Override
-    public String confirmUser(int userId, String verifyCode) {
-        return "Confirmed!";
-    }
 
     @Override
     public UserDetailResponse getUser(long userId) {
@@ -222,24 +202,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public PageResponse<?> advanceSearchWithCriteria(int pageNo, int pageSize, String sortBy, String address, String... search) {
-        return searchRepository.searchUserByCriteria(pageNo, pageSize, sortBy, address, search);
-    }
-
-    private Set<Address> convertToAddress(Set<AddressDTO> addresses) {
-        Set<Address> result = new HashSet<>();
-        addresses.forEach(a ->
-                result.add(Address.builder()
-                        .apartmentNumber(a.getApartmentNumber())
-                        .floor(a.getFloor())
-                        .building(a.getBuilding())
-                        .streetNumber(a.getStreetNumber())
-                        .street(a.getStreet())
-                        .city(a.getCity())
-                        .country(a.getCountry())
-                        .addressType(a.getAddressType())
-                        .build())
-        );
-        return result;
+//        return searchRepository.searchUserByCriteria(pageNo, pageSize, sortBy, address, search);
+        return null;
     }
 
     @Override
@@ -251,21 +215,6 @@ public class UserServiceImpl implements UserService {
     public long saveUser(User user) {
         userRepository.save(user);
         return user.getId();
-    }
-
-    /**
-     * Change status of user by userId
-     *
-     * @param userId
-     * @param status
-     */
-    @Override
-    public void changeStatus(long userId, UserStatus status) {
-        User user = getUserById(userId);
-        user.setStatus(status);
-        userRepository.save(user);
-
-        log.info("User status has changed successfully, userId={}", userId);
     }
 
     /**
@@ -314,7 +263,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User getUserByEmail(String email) {
-        return userRepository.findByEmail(email).orElseThrow(() -> new ResourceNotFoundException("Email not found"));
+        return userRepository.findByEmailIgnoreCase(email).orElseThrow(() -> new ResourceNotFoundException("Email not found"));
     }
 
     /**

@@ -3,6 +3,8 @@ package com.the.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.data.annotation.LastModifiedBy;
 
 import java.io.Serializable;
 
@@ -16,13 +18,13 @@ public abstract class AbstractEntity<T extends Serializable> implements Serializ
     @Column(name = "id")
     private T id;
 
-//    @CreatedBy
-//    @Column(name = "create_by")
-//    T createBy;
-//
-//    @LastModifiedBy
-//    @Column(name = "updated_by")
-//    T updatedBy;
+    @CreatedBy
+    @Column(name = "create_by")
+    T createBy;
+
+    @LastModifiedBy
+    @Column(name = "updated_by")
+    T updatedBy;
 //
 //    @Column(name = "created_at")
 //    @CreationTimestamp

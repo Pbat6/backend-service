@@ -12,7 +12,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import com.the.dto.response.PageResponse;
-import com.the.model.Address;
 import com.the.model.User;
 import com.the.repository.criteria.SearchCriteria;
 import com.the.repository.criteria.UserSearchQueryCriteriaConsumer;
@@ -113,44 +112,44 @@ public class SearchRepository {
      * @param search
      * @return
      */
-    public PageResponse<?> searchUserByCriteria(int offset, int pageSize, String sortBy, String address, String... search) {
-        log.info("Search user with search={} and sortBy={}", search, sortBy);
-
-        List<SearchCriteria> criteriaList = new ArrayList<>();
-
-        if (search.length > 0) {
-            Pattern pattern = Pattern.compile(SEARCH_OPERATOR);
-            for (String s : search) {
-                Matcher matcher = pattern.matcher(s);
-                if (matcher.find()) {
-                    criteriaList.add(new SearchCriteria(matcher.group(1), matcher.group(2), matcher.group(3)));
-                }
-            }
-        }
-
-        if (StringUtils.hasLength(sortBy)) {
-            Pattern pattern = Pattern.compile(SORT_BY);
-            for (String s : search) {
-                Matcher matcher = pattern.matcher(s);
-                if (matcher.find()) {
-                    criteriaList.add(new SearchCriteria(matcher.group(1), matcher.group(2), matcher.group(3)));
-                }
-            }
-        }
-
-        List<User> users = getUsers(offset, pageSize, criteriaList, address, sortBy);
-
-        Long totalElements = getTotalElements(criteriaList);
-
-        Page<User> page = new PageImpl<>(users, PageRequest.of(offset, pageSize), totalElements);
-
-        return PageResponse.builder()
-                .pageNo(offset)
-                .pageSize(pageSize)
-                .totalPage(page.getTotalPages())
-                .items(users)
-                .build();
-    }
+//    public PageResponse<?> searchUserByCriteria(int offset, int pageSize, String sortBy, String address, String... search) {
+//        log.info("Search user with search={} and sortBy={}", search, sortBy);
+//
+//        List<SearchCriteria> criteriaList = new ArrayList<>();
+//
+//        if (search.length > 0) {
+//            Pattern pattern = Pattern.compile(SEARCH_OPERATOR);
+//            for (String s : search) {
+//                Matcher matcher = pattern.matcher(s);
+//                if (matcher.find()) {
+//                    criteriaList.add(new SearchCriteria(matcher.group(1), matcher.group(2), matcher.group(3)));
+//                }
+//            }
+//        }
+//
+//        if (StringUtils.hasLength(sortBy)) {
+//            Pattern pattern = Pattern.compile(SORT_BY);
+//            for (String s : search) {
+//                Matcher matcher = pattern.matcher(s);
+//                if (matcher.find()) {
+//                    criteriaList.add(new SearchCriteria(matcher.group(1), matcher.group(2), matcher.group(3)));
+//                }
+//            }
+//        }
+//
+//        List<User> users = getUsers(offset, pageSize, criteriaList, address, sortBy);
+//
+//        Long totalElements = getTotalElements(criteriaList);
+//
+//        Page<User> page = new PageImpl<>(users, PageRequest.of(offset, pageSize), totalElements);
+//
+//        return PageResponse.builder()
+//                .pageNo(offset)
+//                .pageSize(pageSize)
+//                .totalPage(page.getTotalPages())
+//                .items(users)
+//                .build();
+//    }
 
     /**
      * Get all users with conditions
@@ -161,43 +160,43 @@ public class SearchRepository {
      * @param sortBy
      * @return
      */
-    private List<User> getUsers(int offset, int pageSize, List<SearchCriteria> criteriaList, String address, String sortBy) {
-        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
-        CriteriaQuery<User> query = criteriaBuilder.createQuery(User.class);
-        Root<User> userRoot = query.from(User.class);
-
-        Predicate userPredicate = criteriaBuilder.conjunction();
-        UserSearchQueryCriteriaConsumer searchConsumer = new UserSearchQueryCriteriaConsumer(userPredicate, criteriaBuilder, userRoot);
-
-        if (StringUtils.hasLength(address)) {
-            Join<Address, User> userAddressJoin = userRoot.join("addresses");
-            Predicate addressPredicate = criteriaBuilder.equal(userAddressJoin.get("city"), address);
-            query.where(userPredicate, addressPredicate);
-        } else {
-            criteriaList.forEach(searchConsumer);
-            userPredicate = searchConsumer.getPredicate();
-            query.where(userPredicate);
-        }
-
-        if (StringUtils.hasLength(sortBy)) {
-            Pattern pattern = Pattern.compile(SORT_BY);
-            Matcher matcher = pattern.matcher(sortBy);
-            if (matcher.find()) {
-                String fieldName = matcher.group(1);
-                String direction = matcher.group(3);
-                if (direction.equalsIgnoreCase("asc")) {
-                    query.orderBy(criteriaBuilder.asc(userRoot.get(fieldName)));
-                } else {
-                    query.orderBy(criteriaBuilder.desc(userRoot.get(fieldName)));
-                }
-            }
-        }
-
-        return entityManager.createQuery(query)
-                .setFirstResult(offset)
-                .setMaxResults(pageSize)
-                .getResultList();
-    }
+//    private List<User> getUsers(int offset, int pageSize, List<SearchCriteria> criteriaList, String address, String sortBy) {
+//        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+//        CriteriaQuery<User> query = criteriaBuilder.createQuery(User.class);
+//        Root<User> userRoot = query.from(User.class);
+//
+//        Predicate userPredicate = criteriaBuilder.conjunction();
+//        UserSearchQueryCriteriaConsumer searchConsumer = new UserSearchQueryCriteriaConsumer(userPredicate, criteriaBuilder, userRoot);
+//
+//        if (StringUtils.hasLength(address)) {
+//            Join<Address, User> userAddressJoin = userRoot.join("addresses");
+//            Predicate addressPredicate = criteriaBuilder.equal(userAddressJoin.get("city"), address);
+//            query.where(userPredicate, addressPredicate);
+//        } else {
+//            criteriaList.forEach(searchConsumer);
+//            userPredicate = searchConsumer.getPredicate();
+//            query.where(userPredicate);
+//        }
+//
+//        if (StringUtils.hasLength(sortBy)) {
+//            Pattern pattern = Pattern.compile(SORT_BY);
+//            Matcher matcher = pattern.matcher(sortBy);
+//            if (matcher.find()) {
+//                String fieldName = matcher.group(1);
+//                String direction = matcher.group(3);
+//                if (direction.equalsIgnoreCase("asc")) {
+//                    query.orderBy(criteriaBuilder.asc(userRoot.get(fieldName)));
+//                } else {
+//                    query.orderBy(criteriaBuilder.desc(userRoot.get(fieldName)));
+//                }
+//            }
+//        }
+//
+//        return entityManager.createQuery(query)
+//                .setFirstResult(offset)
+//                .setMaxResults(pageSize)
+//                .getResultList();
+//    }
 
     /**
      * Count users with conditions

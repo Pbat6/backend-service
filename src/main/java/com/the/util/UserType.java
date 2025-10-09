@@ -1,5 +1,12 @@
 package com.the.util;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public enum UserType {
-    OWNER, ADMIN, USER;
+    @JsonProperty("manager")
+    MANAGER,
+    @JsonProperty("admin")
+    ADMIN,
+    @JsonProperty("user")
+    USER;
 }

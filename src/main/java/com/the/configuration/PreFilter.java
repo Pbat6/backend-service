@@ -1,6 +1,7 @@
 package com.the.configuration;
 
 import com.the.service.JwtService;
+import com.the.service.RedisTokenService;
 import com.the.service.UserService;
 import com.the.util.TokenType;
 import jakarta.servlet.FilterChain;
@@ -30,6 +31,7 @@ public class PreFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserService userService;
+    private final RedisTokenService redisTokenService;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -37,26 +39,34 @@ public class PreFilter extends OncePerRequestFilter {
         log.info("---------- doFilterInternal ----------");
 
         final String authorization = request.getHeader(AUTHORIZATION);
-        //log.info("Authorization: {}", authorization);
 
         if (StringUtils.isBlank(authorization) || !authorization.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        final String token = authorization.substring("Bearer ".length());
-        //log.info("Token: {}", token);
+        final String accessToken = authorization.substring("Bearer ".length());
 
-        final String userName = jwtService.extractUsername(token, TokenType.ACCESS_TOKEN);
+        if (redisTokenService.isTokenBlacklisted(accessToken)) {
+            log.warn("Authentication failed: Token is blacklisted.");
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        final String userName = jwtService.extractUsername(accessToken, TokenType.ACCESS_TOKEN);
 
         if (StringUtils.isNotEmpty(userName) && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userService.userDetailsService().loadUserByUsername(userName);
-            if (jwtService.isValid(token, TokenType.ACCESS_TOKEN, userDetails)) {
-                SecurityContext context = SecurityContextHolder.createEmptyContext();
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                context.setAuthentication(authentication);
-                SecurityContextHolder.setContext(context);
+            if (!jwtService.isTokenExpired(accessToken, TokenType.ACCESS_TOKEN)) {
+                try {
+                    SecurityContext context = SecurityContextHolder.createEmptyContext();
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    context.setAuthentication(authentication);
+                    SecurityContextHolder.setContext(context);
+                } catch (Exception e) {
+                    log.error(e.getMessage());
+                }
             }
         }
 

@@ -185,4 +185,78 @@ public class GlobalExceptionHandler {
 
         return errorResponse;
     }
+
+    /**
+     * Handle exception when invalid argument passed
+     *
+     * @param e
+     * @param request
+     * @return errorResponse
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(BAD_REQUEST)
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "400", description = "Bad Request",
+                    content = {@Content(mediaType = APPLICATION_JSON_VALUE,
+                            examples = @ExampleObject(
+                                    name = "400 Illegal Argument",
+                                    summary = "Handle exception when invalid argument or parameter passed",
+                                    value = """
+                                            {
+                                              "timestamp": "2025-10-08T11:38:56.368+00:00",
+                                              "status": 400,
+                                              "path": "/api/v1/...",
+                                              "error": "Bad Request",
+                                              "message": "Invalid token type: RESET"
+                                            }
+                                            """
+                            ))})
+    })
+    public ErrorResponse handleIllegalArgumentException(IllegalArgumentException e, WebRequest request) {
+        ErrorResponse errorResponse = new ErrorResponse();
+        errorResponse.setTimestamp(new Date());
+        errorResponse.setStatus(BAD_REQUEST.value());
+        errorResponse.setPath(request.getDescription(false).replace("uri=", ""));
+        errorResponse.setError("Bad Request");
+        errorResponse.setMessage(e.getMessage());
+
+        return errorResponse;
+    }
+
+    /**
+     * Handle exception when authentication fails (e.g., wrong password).
+     *
+     * @param e       the exception
+     * @param request the current request
+     * @return an ErrorResponse with 401 status
+     */
+    @ExceptionHandler(BadCredentialsException.class)
+    @ResponseStatus(UNAUTHORIZED)
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = {@Content(mediaType = APPLICATION_JSON_VALUE,
+                            examples = @ExampleObject(
+                                    name = "401 Unauthorized",
+                                    summary = "Handle exception for bad credentials",
+                                    value = """
+                                        {
+                                          "timestamp": "2025-10-09T08:15:30.123+00:00",
+                                          "status": 401,
+                                          "path": "/api/v1/auth/sign-in",
+                                          "error": "Unauthorized",
+                                          "message": "Bad credentials"
+                                        }
+                                        """
+                            ))})
+    })
+    public ErrorResponse handleBadCredentialsException(BadCredentialsException e, WebRequest request) {
+        ErrorResponse errorResponse = new ErrorResponse();
+        errorResponse.setTimestamp(new Date());
+        errorResponse.setPath(request.getDescription(false).replace("uri=", ""));
+        errorResponse.setStatus(UNAUTHORIZED.value());
+        errorResponse.setError(UNAUTHORIZED.getReasonPhrase());
+        errorResponse.setMessage(e.getMessage()); // Hoặc một message tùy chỉnh như "Incorrect username or password"
+
+        return errorResponse;
+    }
 }

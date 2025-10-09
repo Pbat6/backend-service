@@ -1,5 +1,6 @@
 package com.the.service;
 
+import com.the.dto.request.ResetPasswordEvent;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
@@ -31,108 +32,40 @@ public class MailService {
     @Value("${spring.mail.from}")
     private String emailFrom;
 
-    @Value("${endpoint.confirmUser}")
-    private String apiConfirmUser;
+    @Value("${endpoint.resetPassword}")
+    private String apiResetPassword;
 
-    /**
-     * Send email by Google SMTP
-     *
-     * @param recipients
-     * @param subject
-     * @param content
-     * @param files
-     * @return
-     * @throws UnsupportedEncodingException
-     * @throws MessagingException
-     */
-    public String sendEmail(String recipients, String subject, String content, MultipartFile[] files) throws UnsupportedEncodingException, MessagingException {
-        log.info("Email is sending ...");
+    @Value("${jwt.expiryMinute}")
+    private String expiryMinute;
 
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-        helper.setFrom(emailFrom, "Tây Java");
+    @KafkaListener(topics = "reset-password-topic", groupId = "reset-password-group")
+    public void sendConfirmLinkByKafka(ResetPasswordEvent event) throws MessagingException, UnsupportedEncodingException {
+        log.info("Sending link to user, email={}", event);
 
-        if (recipients.contains(",")) { // send to multiple users
-            helper.setTo(InternetAddress.parse(recipients));
-        } else { // send to single user
-            helper.setTo(recipients);
-        }
-
-        // Send attach files
-        if (files != null) {
-            for (MultipartFile file : files) {
-                helper.addAttachment(Objects.requireNonNull(file.getOriginalFilename()), file);
-            }
-        }
-
-        helper.setSubject(subject);
-        helper.setText(content, true);
-        mailSender.send(message);
-
-        log.info("Email has sent to successfully, recipients: {}", recipients);
-
-        return "Sent";
-    }
-
-    /**
-     * Send link confirm to email register.
-     *
-     * @param emailTo
-     * @param userId
-     * @param verifyCode
-     * @throws MessagingException
-     * @throws UnsupportedEncodingException
-     */
-    public void sendConfirmLink(String emailTo, long userId, String verifyCode) throws MessagingException, UnsupportedEncodingException {
-        log.info("Sending confirming link to user, email={}", emailTo);
-
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED, StandardCharsets.UTF_8.name());
-        Context context = new Context();
-
-        // http://localhost:80/user/confirm/{userId}?verifyCode={verifyCode}
-        String linkConfirm = String.format("%s/%s?verifyCode=%s", apiConfirmUser, userId, verifyCode);
-
-        Map<String, Object> properties = new HashMap<>();
-        properties.put("linkConfirm", linkConfirm);
-        context.setVariables(properties);
-
-        helper.setFrom(emailFrom, "Tây Java");
-        helper.setTo(emailTo);
-        helper.setSubject("Please confirm your account");
-        String html = templateEngine.process("confirm-email.html", context);
-        helper.setText(html, true);
-
-        mailSender.send(message);
-        log.info("Confirming link has sent to user, email={}, linkConfirm={}", emailTo, linkConfirm);
-    }
-
-    @KafkaListener(topics = "confirm-account-topic", groupId = "confirm-account-group")
-    public void sendConfirmLinkByKafka(String message) throws MessagingException, UnsupportedEncodingException {
-        log.info("Sending link to user, email={}", message);
-
-        String[] arr = message.split(",");
-        String emailTo = arr[0].substring(arr[0].indexOf('=') + 1);
-        String userId = arr[1].substring(arr[1].indexOf('=') + 1);
-        String verifyCode = arr[2].substring(arr[2].indexOf('=') + 1);
+        String emailTo = event.getEmail();
+        String username = event.getUsername();
+        String resetToken = event.getToken();
+        String type = event.getType();
 
         MimeMessage mimeMessage = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED, StandardCharsets.UTF_8.name());
         Context context = new Context();
 
-        String linkConfirm = String.format("%s/%s?verifyCode=%s", apiConfirmUser, userId, verifyCode);
+        String linkReset = String.format("%s/resetToken=%s", apiResetPassword, resetToken);
 
         Map<String, Object> properties = new HashMap<>();
-        properties.put("linkConfirm", linkConfirm);
+        properties.put("linkReset", linkReset);
+        properties.put("username", username);
+        properties.put("type", type);
+        properties.put("expiryMinute", expiryMinute);
         context.setVariables(properties);
 
-        helper.setFrom(emailFrom, "Tây Java");
+        helper.setFrom(emailFrom, "The");
         helper.setTo(emailTo);
-        helper.setSubject("Please confirm your account");
-        String html = templateEngine.process("confirm-email.html", context);
+        helper.setSubject("Please change your password");
+        String html = templateEngine.process("reset-password.html", context);
         helper.setText(html, true);
 
         mailSender.send(mimeMessage);
-        log.info("Link has sent to user, email={}, linkConfirm={}", emailTo, linkConfirm);
     }
 }
