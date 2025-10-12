@@ -1,15 +1,13 @@
 package com.the.service;
 
+import com.the.dto.request.UpdateUserDTO;
 import com.the.model.User;
-import jakarta.mail.MessagingException;
-import com.the.dto.request.UserRequestDTO;
+import com.the.dto.request.SignUpDTO;
 import com.the.dto.response.PageResponse;
 import com.the.dto.response.UserDetailResponse;
-import com.the.util.UserStatus;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Service;
 
-import java.io.UnsupportedEncodingException;
 import java.util.List;
 
 @Service
@@ -17,15 +15,15 @@ public interface UserService {
 
     UserDetailsService userDetailsService();
 
-    long saveUser(UserRequestDTO request) throws MessagingException, UnsupportedEncodingException;
+    Long saveUser(SignUpDTO request, User creator);
 
-    void updateUser(long userId, UserRequestDTO request);
+    void updateUser(long userId, UpdateUserDTO request, User actor);
 
-    void deleteUser(long userId);
+    void deleteUser(long userId, User actor);
 
-    UserDetailResponse getUser(long userId);
+    UserDetailResponse getUser(long userId, User actor);
 
-    PageResponse<?> getAllUsersWithSortBy(int pageNo, int pageSize, String sortBy);
+    PageResponse<?> getAllUsersWithSortBy(int pageNo, int pageSize, String sortBy, User actor);
 
     PageResponse<?> getAllUsersWithSortByMultipleColumns(int pageNo, int pageSize, String... sorts);
 

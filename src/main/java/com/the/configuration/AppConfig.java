@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -37,6 +38,12 @@ public class AppConfig {
                 .authorizeHttpRequests(request -> request
                         .requestMatchers("/auth/change-password", "/auth/log-out").authenticated()
                         .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/common/resend-link").hasAnyAuthority("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/user/").hasAnyAuthority("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.PUT, "/user/*").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/user/*").hasAnyAuthority("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.GET, "/user/*").authenticated()
+                        .requestMatchers("/user/list").hasAnyAuthority("ADMIN", "MANAGER")
                         .anyRequest().authenticated())
                 .sessionManagement(manager -> manager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider()).addFilterBefore(preFilter, UsernamePasswordAuthenticationFilter.class);

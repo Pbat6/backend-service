@@ -1,8 +1,8 @@
 package com.the.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.LastModifiedBy;
 
@@ -11,6 +11,9 @@ import java.io.Serializable;
 @Getter
 @Setter
 @MappedSuperclass
+@SuperBuilder
+@AllArgsConstructor
+@NoArgsConstructor
 public abstract class AbstractEntity<T extends Serializable> implements Serializable   {
 
     @Id

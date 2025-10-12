@@ -1,6 +1,7 @@
 package com.the.repository;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
 import jakarta.persistence.criteria.*;
@@ -11,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import com.the.dto.response.UserDetailResponse;
 import com.the.dto.response.PageResponse;
 import com.the.model.User;
 import com.the.repository.criteria.SearchCriteria;
@@ -45,7 +47,8 @@ public class SearchRepository {
     public PageResponse<?> searchUser(int pageNo, int pageSize, String search, String sortBy) {
         log.info("Execute search user with keyword={}", search);
 
-        StringBuilder sqlQuery = new StringBuilder("SELECT new vn.tayjava.dto.response.UserDetailResponse(u.id, u.firstName, u.lastName, u.phone, u.email) FROM User u WHERE 1=1");
+//        StringBuilder sqlQuery = new StringBuilder("SELECT new vn.tayjava.dto.response.UserDetailResponse(u.id, u.firstName, u.lastName, u.phone, u.email) FROM User u WHERE 1=1");
+        StringBuilder sqlQuery = new StringBuilder("SELECT new com.the.dto.response.UserDetailResponse(u.id, u.firstName, u.lastName, u.phone, u.email) FROM User u WHERE 1=1");
         if (StringUtils.hasLength(search)) {
             sqlQuery.append(" AND lower(u.firstName) like lower(:firstName)");
             sqlQuery.append(" OR lower(u.lastName) like lower(:lastName)");
@@ -69,6 +72,7 @@ public class SearchRepository {
             selectQuery.setParameter("email", String.format(LIKE_FORMAT, search));
         }
         selectQuery.setFirstResult(pageNo);
+        selectQuery.setFirstResult(pageNo * pageSize);
         selectQuery.setMaxResults(pageSize);
         List<?> users = selectQuery.getResultList();
 
@@ -89,6 +93,13 @@ public class SearchRepository {
         }
 
         Long totalElements = (Long) countQuery.getSingleResult();
+//        Long totalElements;
+        try {
+            totalElements = (Long) countQuery.getSingleResult();
+        } catch (NoResultException e) {
+            totalElements = 0L;
+        }
+
         log.info("totalElements={}", totalElements);
 
         Pageable pageable = PageRequest.of(pageNo, pageSize);

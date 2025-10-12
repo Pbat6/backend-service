@@ -2,7 +2,7 @@ package com.the.controller;
 
 import com.the.dto.request.ChangePasswordDTO;
 import com.the.dto.request.ResetPasswordDTO;
-import com.the.dto.request.SignInRequest;
+import com.the.dto.request.SignInDTO;
 import com.the.dto.response.ResponseData;
 import com.the.dto.response.TokenResponse;
 import com.the.service.AuthenticationService;
@@ -31,7 +31,7 @@ public class AuthenticationController {
     private final AuthenticationService authenticationService;
 
     @PostMapping("/sign-in")
-    public ResponseData<TokenResponse> accessToken(@RequestBody SignInRequest request, HttpServletResponse response) {
+    public ResponseData<TokenResponse> accessToken(@RequestBody SignInDTO request, HttpServletResponse response) {
         return new ResponseData<>(HttpStatus.OK.value(), "Login successful", authenticationService.signIn(request, response));
     }
 

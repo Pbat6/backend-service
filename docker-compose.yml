@@ -69,17 +69,17 @@ services:
 #      kafka-topics --create --partitions 3 --bootstrap-server kafka:9092 --topic input
 #      kafka-topics --create --bootstrap-server kafka:9092 --partitions 1 --topic output
 
-  user-service:
-    container_name: user-service
-    build:
-      context: ./
-      dockerfile: Dockerfile
-    env_file:
-      - .env
-    ports:
-      - '8080:8080'
-    networks:
-      - backend
+#  user-service:
+#    container_name: user-service
+#    build:
+#      context: ./
+#      dockerfile: Dockerfile
+#    env_file:
+#      - .env
+#    ports:
+#      - '8080:8080'
+#    networks:
+#      - backend
 
 networks:
   backend:

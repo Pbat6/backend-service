@@ -3,26 +3,22 @@ package com.the.dto.request;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import org.springframework.format.annotation.DateTimeFormat;
-import com.the.dto.validator.EnumPattern;
 import com.the.dto.validator.EnumValue;
 import com.the.dto.validator.GenderSubset;
 import com.the.dto.validator.PhoneNumber;
 import com.the.util.Gender;
-import com.the.util.UserStatus;
 import com.the.util.UserType;
 
 import java.io.Serializable;
 import java.util.Date;
-import java.util.Set;
 
 import static com.the.util.Gender.*;
 
 @Getter
-public class UserRequestDTO implements Serializable {
+public class SignUpDTO implements Serializable {
 
     @NotBlank(message = "firstName must be not blank") // Khong cho phep gia tri blank
     private String firstName;
@@ -53,12 +49,11 @@ public class UserRequestDTO implements Serializable {
 
     @NotNull(message = "type must be not null")
     @EnumValue(name = "type", enumClass = UserType.class)
-    private String type;
+    private String role;
 
-    @EnumPattern(name = "status", regexp = "ACTIVE|INACTIVE|NONE")
-    private UserStatus status;
+    private String city;
 
-    public UserRequestDTO(String firstName, String lastName, String email, String phone) {
+    public SignUpDTO(String firstName, String lastName, String email, String phone) {
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;

@@ -1,10 +1,9 @@
 package com.the.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.the.dto.request.ChangePasswordDTO;
 import com.the.dto.request.ResetPasswordDTO;
 import com.the.dto.request.ResetPasswordEvent;
-import com.the.dto.request.SignInRequest;
+import com.the.dto.request.SignInDTO;
 import com.the.dto.response.TokenResponse;
 import com.the.exception.BadCredentialsException;
 import com.the.exception.InvalidDataException;
@@ -13,6 +12,7 @@ import com.the.model.User;
 import com.the.repository.UserRepository;
 import com.the.util.CookieUtil;
 import com.the.util.TokenType;
+import com.the.util.UserStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +46,7 @@ public class AuthenticationService {
     @Value("${jwt.expiryMinute}")
     private Integer expiryMinute;
 
-    public TokenResponse signIn(SignInRequest signInRequest, HttpServletResponse response) {
+    public TokenResponse signIn(SignInDTO signInRequest, HttpServletResponse response) {
         log.info("---------- accessToken ----------");
         User user = userService.getByUsername(signInRequest.getUsername());
         if (!user.isEnabled()) {
@@ -134,8 +134,6 @@ public class AuthenticationService {
             String resetToken = jwtService.generateResetToken(user);
             redisTokenService.save(RedisToken.builder().id(user.getUsername()).resetToken(resetToken).build());
             ResetPasswordEvent event = new ResetPasswordEvent(user.getEmail(), user.getUsername(), resetToken, "reset");
-            // publish reset password event to Kafka
-//            String message = String.format("email=%s,username=%s,resetToken=%s,type=reset", user.getEmail(), user.getUsername(), resetToken);
             kafkaTemplate.send("reset-password-topic", event);
         }catch (Exception e){
             log.error("Exception occurred in forgotPassword for email {}", email, e);
@@ -162,7 +160,7 @@ public class AuthenticationService {
         }
         User user = userService.getByUsername(username);
         if (!user.isEnabled()) {
-            throw new InvalidDataException("User account is not active.");
+            user.setStatus(UserStatus.ACTIVE);
         }
         user.setPassword(passwordEncoder.encode(resetPasswordDTO.getPassword()));
         userRepository.save(user);
