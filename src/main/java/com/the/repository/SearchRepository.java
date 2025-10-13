@@ -1,5 +1,7 @@
 package com.the.repository;
 
+import com.the.dto.response.UserDetailResponse;
+import com.the.exception.InvalidDataException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;
@@ -12,14 +14,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import com.the.dto.response.UserDetailResponse;
 import com.the.dto.response.PageResponse;
 import com.the.model.User;
-import com.the.repository.criteria.SearchCriteria;
+import com.the.dto.request.SearchCriteria;
 import com.the.repository.criteria.UserSearchQueryCriteriaConsumer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,85 +36,19 @@ public class SearchRepository {
     private EntityManager entityManager;
 
     private static final String LIKE_FORMAT = "%%%s%%";
+    private static final Pattern SEARCH_OPERATOR_PATTERN = Pattern.compile(SEARCH_OPERATOR);
+    private static final Pattern SORT_BY_PATTERN = Pattern.compile(SORT_BY);
 
-    /**
-     * Search user using keyword and
-     *
-     * @param pageNo
-     * @param pageSize
-     * @param search
-     * @param sortBy
-     * @return user list with sorting and paging
-     */
-    public PageResponse<?> searchUser(int pageNo, int pageSize, String search, String sortBy) {
-        log.info("Execute search user with keyword={}", search);
-
-//        StringBuilder sqlQuery = new StringBuilder("SELECT new vn.tayjava.dto.response.UserDetailResponse(u.id, u.firstName, u.lastName, u.phone, u.email) FROM User u WHERE 1=1");
-        StringBuilder sqlQuery = new StringBuilder("SELECT new com.the.dto.response.UserDetailResponse(u.id, u.firstName, u.lastName, u.phone, u.email) FROM User u WHERE 1=1");
-        if (StringUtils.hasLength(search)) {
-            sqlQuery.append(" AND lower(u.firstName) like lower(:firstName)");
-            sqlQuery.append(" OR lower(u.lastName) like lower(:lastName)");
-            sqlQuery.append(" OR lower(u.email) like lower(:email)");
-        }
-
-        if (StringUtils.hasLength(sortBy)) {
-            // firstName:asc|desc
-            Pattern pattern = Pattern.compile(SORT_BY);
-            Matcher matcher = pattern.matcher(sortBy);
-            if (matcher.find()) {
-                sqlQuery.append(String.format(" ORDER BY u.%s %s", matcher.group(1), matcher.group(3)));
-            }
-        }
-
-        // Get list of users
-        Query selectQuery = entityManager.createQuery(sqlQuery.toString());
-        if (StringUtils.hasLength(search)) {
-            selectQuery.setParameter("firstName", String.format(LIKE_FORMAT, search));
-            selectQuery.setParameter("lastName", String.format(LIKE_FORMAT, search));
-            selectQuery.setParameter("email", String.format(LIKE_FORMAT, search));
-        }
-        selectQuery.setFirstResult(pageNo);
-        selectQuery.setFirstResult(pageNo * pageSize);
-        selectQuery.setMaxResults(pageSize);
-        List<?> users = selectQuery.getResultList();
-
-        // Count users
-        StringBuilder sqlCountQuery = new StringBuilder("SELECT COUNT(*) FROM User u");
-        if (StringUtils.hasLength(search)) {
-            sqlCountQuery.append(" WHERE lower(u.firstName) like lower(?1)");
-            sqlCountQuery.append(" OR lower(u.lastName) like lower(?2)");
-            sqlCountQuery.append(" OR lower(u.email) like lower(?3)");
-        }
-
-        Query countQuery = entityManager.createQuery(sqlCountQuery.toString());
-        if (StringUtils.hasLength(search)) {
-            countQuery.setParameter(1, String.format(LIKE_FORMAT, search));
-            countQuery.setParameter(2, String.format(LIKE_FORMAT, search));
-            countQuery.setParameter(3, String.format(LIKE_FORMAT, search));
-            countQuery.getSingleResult();
-        }
-
-        Long totalElements = (Long) countQuery.getSingleResult();
-//        Long totalElements;
-        try {
-            totalElements = (Long) countQuery.getSingleResult();
-        } catch (NoResultException e) {
-            totalElements = 0L;
-        }
-
-        log.info("totalElements={}", totalElements);
-
-        Pageable pageable = PageRequest.of(pageNo, pageSize);
-
-        Page<?> page = new PageImpl<>(users, pageable, totalElements);
-
-        return PageResponse.builder()
-                .pageNo(pageNo)
-                .pageSize(pageSize)
-                .totalPage(page.getTotalPages())
-                .items(users)
-                .build();
-    }
+    private static final Set<String> ALLOWED_FIELDS = Set.of(
+            "id",
+            "firstName",
+            "lastName",
+            "phone",
+            "email",
+            "username",
+            "roles"
+            // Thêm các trường khác
+    );
 
     /**
      * Advance search user by criterias
@@ -123,44 +59,55 @@ public class SearchRepository {
      * @param search
      * @return
      */
-//    public PageResponse<?> searchUserByCriteria(int offset, int pageSize, String sortBy, String address, String... search) {
-//        log.info("Search user with search={} and sortBy={}", search, sortBy);
-//
-//        List<SearchCriteria> criteriaList = new ArrayList<>();
-//
-//        if (search.length > 0) {
-//            Pattern pattern = Pattern.compile(SEARCH_OPERATOR);
-//            for (String s : search) {
-//                Matcher matcher = pattern.matcher(s);
-//                if (matcher.find()) {
-//                    criteriaList.add(new SearchCriteria(matcher.group(1), matcher.group(2), matcher.group(3)));
-//                }
-//            }
-//        }
-//
-//        if (StringUtils.hasLength(sortBy)) {
-//            Pattern pattern = Pattern.compile(SORT_BY);
-//            for (String s : search) {
-//                Matcher matcher = pattern.matcher(s);
-//                if (matcher.find()) {
-//                    criteriaList.add(new SearchCriteria(matcher.group(1), matcher.group(2), matcher.group(3)));
-//                }
-//            }
-//        }
-//
-//        List<User> users = getUsers(offset, pageSize, criteriaList, address, sortBy);
-//
-//        Long totalElements = getTotalElements(criteriaList);
-//
-//        Page<User> page = new PageImpl<>(users, PageRequest.of(offset, pageSize), totalElements);
-//
-//        return PageResponse.builder()
-//                .pageNo(offset)
-//                .pageSize(pageSize)
-//                .totalPage(page.getTotalPages())
-//                .items(users)
-//                .build();
-//    }
+    public PageResponse<?> searchUserByCriteria(int offset, int pageSize, String sortBy, User actor, String... search) {
+        log.info("Search user with search={} and sortBy={}", search, sortBy);
+
+        List<SearchCriteria> criteriaList = new ArrayList<>();
+        if (search.length > 0) {
+            for (String s : search) {
+                Matcher matcher = SEARCH_OPERATOR_PATTERN.matcher(s);
+                if (matcher.find()) {
+                    String key = matcher.group(1);
+                    // Kiểm tra key có hợp lệ không
+                    if (!ALLOWED_FIELDS.contains(key)) {
+                        throw new IllegalArgumentException("Trường tìm kiếm không hợp lệ: '" + key + "'");
+                    }
+                    if(key.equalsIgnoreCase("roles")){
+                        boolean isActorAdmin = actor.getRoles().stream().anyMatch(uhr -> uhr.getRole().getName().equalsIgnoreCase("ADMIN"));
+                        if(!isActorAdmin){
+                            throw new InvalidDataException("chi admin moi co the tim kiem theo role");
+                        }
+                    }
+                    criteriaList.add(new SearchCriteria(matcher.group(1), matcher.group(2), matcher.group(3)));
+                }else {
+                    throw new IllegalArgumentException("search sai format or thua field");
+                }
+            }
+        }
+
+        List<User> users = getUsers(offset, pageSize, criteriaList, sortBy);
+        List<UserDetailResponse> responses = users.stream().map(user -> UserDetailResponse.builder()
+                .id(user.getId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .phone(user.getPhone())
+                .email(user.getEmail())
+                .roles(user.getRoles().stream().map(uhr -> uhr.getRole().getName()).toList())
+                .username(user.getUsername())
+                .build()).toList();
+
+        Long totalElements = getTotalElements(criteriaList);
+
+        Page<User> page = new PageImpl<>(users, PageRequest.of(offset, pageSize), totalElements);
+
+        return PageResponse.<List<UserDetailResponse>>builder()
+                .pageNo(offset)
+                .pageSize(pageSize)
+                .totalPage(page.getTotalPages())
+                .totalItem(page.getTotalElements())
+                .items(responses)
+                .build();
+    }
 
     /**
      * Get all users with conditions
@@ -171,43 +118,37 @@ public class SearchRepository {
      * @param sortBy
      * @return
      */
-//    private List<User> getUsers(int offset, int pageSize, List<SearchCriteria> criteriaList, String address, String sortBy) {
-//        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
-//        CriteriaQuery<User> query = criteriaBuilder.createQuery(User.class);
-//        Root<User> userRoot = query.from(User.class);
-//
-//        Predicate userPredicate = criteriaBuilder.conjunction();
-//        UserSearchQueryCriteriaConsumer searchConsumer = new UserSearchQueryCriteriaConsumer(userPredicate, criteriaBuilder, userRoot);
-//
-//        if (StringUtils.hasLength(address)) {
-//            Join<Address, User> userAddressJoin = userRoot.join("addresses");
-//            Predicate addressPredicate = criteriaBuilder.equal(userAddressJoin.get("city"), address);
-//            query.where(userPredicate, addressPredicate);
-//        } else {
-//            criteriaList.forEach(searchConsumer);
-//            userPredicate = searchConsumer.getPredicate();
-//            query.where(userPredicate);
-//        }
-//
-//        if (StringUtils.hasLength(sortBy)) {
-//            Pattern pattern = Pattern.compile(SORT_BY);
-//            Matcher matcher = pattern.matcher(sortBy);
-//            if (matcher.find()) {
-//                String fieldName = matcher.group(1);
-//                String direction = matcher.group(3);
-//                if (direction.equalsIgnoreCase("asc")) {
-//                    query.orderBy(criteriaBuilder.asc(userRoot.get(fieldName)));
-//                } else {
-//                    query.orderBy(criteriaBuilder.desc(userRoot.get(fieldName)));
-//                }
-//            }
-//        }
-//
-//        return entityManager.createQuery(query)
-//                .setFirstResult(offset)
-//                .setMaxResults(pageSize)
-//                .getResultList();
-//    }
+    private List<User> getUsers(int offset, int pageSize, List<SearchCriteria> criteriaList, String sortBy) {
+        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder(); // Giúp tạo Query
+        CriteriaQuery<User> query = criteriaBuilder.createQuery(User.class); // Định nghĩa kiểu dữ liệu muốn trả về
+        Root<User> userRoot = query.from(User.class); // Tương đương với from User u trong sql
+
+        Predicate userPredicate = createPredicateForUserSearch(criteriaBuilder, userRoot, criteriaList); // Tương đương điều kiện where
+        query.where(userPredicate);
+
+        if (StringUtils.hasLength(sortBy)) {
+            Matcher matcher = SORT_BY_PATTERN.matcher(sortBy);
+            if (matcher.find()) {
+                String fieldName = matcher.group(1);
+                String direction = matcher.group(3);
+                if (!ALLOWED_FIELDS.contains(fieldName)) {
+                    throw new IllegalArgumentException("Trường sắp xếp không hợp lệ: '" + fieldName + "'");
+                }
+                if (direction.equalsIgnoreCase("asc")) {
+                    query.orderBy(criteriaBuilder.asc(userRoot.get(fieldName)));
+                } else {
+                    query.orderBy(criteriaBuilder.desc(userRoot.get(fieldName)));
+                }
+            }else{
+                throw new IllegalArgumentException("sort by sai format");
+            }
+        }
+
+        return entityManager.createQuery(query)
+                .setFirstResult(offset)
+                .setMaxResults(pageSize)
+                .getResultList();
+    }
 
     /**
      * Count users with conditions
@@ -220,13 +161,18 @@ public class SearchRepository {
         CriteriaQuery<Long> query = criteriaBuilder.createQuery(Long.class);
         Root<User> root = query.from(User.class);
 
-        Predicate predicate = criteriaBuilder.conjunction();
-        UserSearchQueryCriteriaConsumer searchConsumer = new UserSearchQueryCriteriaConsumer(predicate, criteriaBuilder, root);
-        params.forEach(searchConsumer);
-        predicate = searchConsumer.getPredicate();
+        Predicate predicate = createPredicateForUserSearch(criteriaBuilder, root, params);
         query.select(criteriaBuilder.count(root));
         query.where(predicate);
 
         return entityManager.createQuery(query).getSingleResult();
+    }
+
+    // Phương thức chung để tạo Predicate
+    private Predicate createPredicateForUserSearch(CriteriaBuilder cb, Root<User> root, List<SearchCriteria> criteriaList) {
+        Predicate predicate = cb.conjunction();
+        UserSearchQueryCriteriaConsumer searchConsumer = new UserSearchQueryCriteriaConsumer(predicate, cb, root);
+        criteriaList.forEach(searchConsumer);
+        return searchConsumer.getPredicate(); // Lấy ra điều kiện đã được xây dựng từ params.forEach(searchConsumer);
     }
 }

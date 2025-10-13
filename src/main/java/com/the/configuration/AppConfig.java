@@ -39,11 +39,11 @@ public class AppConfig {
                         .requestMatchers("/auth/change-password", "/auth/log-out").authenticated()
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/common/resend-link").hasAnyAuthority("ADMIN", "MANAGER")
+                        .requestMatchers("/user/list", "/user/search").hasAnyAuthority("ADMIN", "MANAGER")
                         .requestMatchers(HttpMethod.POST, "/user/").hasAnyAuthority("ADMIN", "MANAGER")
                         .requestMatchers(HttpMethod.PUT, "/user/*").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/user/*").hasAnyAuthority("ADMIN", "MANAGER")
                         .requestMatchers(HttpMethod.GET, "/user/*").authenticated()
-                        .requestMatchers("/user/list").hasAnyAuthority("ADMIN", "MANAGER")
                         .anyRequest().authenticated())
                 .sessionManagement(manager -> manager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider()).addFilterBefore(preFilter, UsernamePasswordAuthenticationFilter.class);

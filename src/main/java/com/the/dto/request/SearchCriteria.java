@@ -1,4 +1,4 @@
-package com.the.repository.criteria;
+package com.the.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

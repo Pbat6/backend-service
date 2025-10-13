@@ -36,6 +36,7 @@ import com.the.util.UserType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -192,7 +193,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public PageResponse<?> getAllUsersWithSortBy(int pageNo, int pageSize, String sortBy, User actor) {
-        int page = pageNo + 1;
+            int page = pageNo + 1;
 
         List<Sort.Order> sorts = new ArrayList<>();
 
@@ -211,7 +212,18 @@ public class UserServiceImpl implements UserService {
 
         Pageable pageable = PageRequest.of(pageNo, pageSize, Sort.by(sorts));
 
-        Page<User> users = userRepository.findAll(pageable);
+        boolean isActorManager = checkRole(actor, UserType.MANAGER);
+        Page<User> users;
+        try{
+            if(isActorManager){
+                users = userRepository.findUsersByRoleName(UserType.USER.name(), pageable);
+            }else{
+                users = userRepository.findAll(pageable);
+            }
+        }catch (Exception e){
+            throw new InvalidDataException("Sai column name");
+        }
+
 
         List<UserDetailResponse> response = users.stream().map(user -> UserDetailResponse.builder()
                 .id(user.getId())
@@ -225,73 +237,19 @@ public class UserServiceImpl implements UserService {
                 .pageNo(page)
                 .pageSize(pageSize)
                 .totalPage(users.getTotalPages())
+                .totalItem(users.getTotalElements())
                 .items(response)
                 .build();
     }
 
     @Override
-    public PageResponse<?> getAllUsersWithSortByMultipleColumns(int pageNo, int pageSize, String... sorts) {
-        int page = 0;
-        if (pageNo > 0) {
-            page = pageNo - 1;
-        }
-
-        List<Sort.Order> orders = new ArrayList<>();
-
-        if (sorts != null) {
-            for (String sortBy : sorts) {
-                log.info("sortBy: {}", sortBy);
-                // firstName:asc|desc
-                Pattern pattern = Pattern.compile("(\\w+?)(:)(.*)");
-                Matcher matcher = pattern.matcher(sortBy);
-                if (matcher.find()) {
-                    if (matcher.group(3).equalsIgnoreCase("asc")) {
-                        orders.add(new Sort.Order(Sort.Direction.ASC, matcher.group(1)));
-                    } else {
-                        orders.add(new Sort.Order(Sort.Direction.DESC, matcher.group(1)));
-                    }
-                }
-            }
-        }
-
-        Pageable pageable = PageRequest.of(page, pageSize, Sort.by(orders));
-
-        Page<User> users = userRepository.findAll(pageable);
-        List<UserDetailResponse> response = users.stream().map(user -> UserDetailResponse.builder()
-                .id(user.getId())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .email(user.getEmail())
-                .phone(user.getPhone())
-                .build()).toList();
-        return PageResponse.builder()
-                .pageNo(pageNo)
-                .pageSize(pageSize)
-                .totalPage(users.getTotalPages())
-                .items(response)
-                .build();
-    }
-
-    @Override
-    public PageResponse<?> getAllUsersAndSearchWithPagingAndSorting(int pageNo, int pageSize, String search, String sort) {
-        return searchRepository.searchUser(pageNo, pageSize, search, sort);
-    }
-
-    @Override
-    public PageResponse<?> advanceSearchWithCriteria(int pageNo, int pageSize, String sortBy, String address, String... search) {
-//        return searchRepository.searchUserByCriteria(pageNo, pageSize, sortBy, address, search);
-        return null;
+    public PageResponse<?> advanceSearchWithCriteria(int pageNo, int pageSize, String sortBy, User actor, String... search) {
+        return searchRepository.searchUserByCriteria(pageNo, pageSize, sortBy, actor, search);
     }
 
     @Override
     public User getByUsername(String userName) {
         return userRepository.findByUsername(userName).orElseThrow(() -> new UsernameNotFoundException("User not found"));
-    }
-
-    @Override
-    public long saveUser(User user) {
-        userRepository.save(user);
-        return user.getId();
     }
 
     /**
@@ -318,34 +276,6 @@ public class UserServiceImpl implements UserService {
         userRepository.deleteById(userId);
         redisTokenService.remove(user.getUsername());
         log.info("User has deleted permanent successfully, userId={}", userId);
-    }
-
-    /**
-     * Get all user per pageNo and pageSize
-     *
-     * @param pageNo
-     * @param pageSize
-     * @return
-     */
-    @Override
-    public PageResponse<?> getAllUsers(int pageNo, int pageSize) {
-        Page<User> page = userRepository.findAll(PageRequest.of(pageNo, pageSize));
-
-        List<UserDetailResponse> list = page.stream().map(user -> UserDetailResponse.builder()
-                        .id(user.getId())
-                        .firstName(user.getFirstName())
-                        .lastName(user.getLastName())
-                        .phone(user.getPhone())
-                        .email(user.getEmail())
-                        .build())
-                .toList();
-
-        return PageResponse.builder()
-                .pageNo(pageNo)
-                .pageSize(pageSize)
-                .totalPage(page.getTotalPages())
-                .items(list)
-                .build();
     }
 
     @Override

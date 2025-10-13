@@ -62,6 +62,7 @@ public class User extends AbstractEntity<Long> implements UserDetails {
     @Column(name = "status")
     private UserStatus status;
 
+    @JsonIgnore // stop infinitive loop
     @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     private Set<UserHasRole> roles = new HashSet<>();
 
