@@ -46,6 +46,8 @@ public class AuthenticationService {
     @Value("${jwt.expiryMinute}")
     private Integer expiryMinute;
 
+    private static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
+
     public TokenResponse signIn(SignInDTO signInRequest, HttpServletResponse response) {
         log.info("---------- accessToken ----------");
         User user = userService.getByUsername(signInRequest.getUsername());
@@ -58,7 +60,7 @@ public class AuthenticationService {
         // create new refresh token
         String refreshToken = jwtService.generateRefreshToken(user);
         redisTokenService.save(RedisToken.builder().id(user.getUsername()).refreshToken(refreshToken).build());
-        cookieUtil.create(response, "refreshToken", refreshToken, expiryMinute);
+        cookieUtil.create(response, REFRESH_TOKEN_COOKIE_NAME, refreshToken, expiryMinute);
         return TokenResponse.builder()
                 .accessToken(accessToken)
                 .userId(user.getId())
@@ -96,7 +98,7 @@ public class AuthenticationService {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             User user = validateAndGetUserFromRefreshToken(request);
             redisTokenService.remove(user.getUsername());
-            cookieUtil.clear(response, "refreshToken");
+            cookieUtil.clear(response, REFRESH_TOKEN_COOKIE_NAME);
         }else{
             final String accessToken = authHeader.substring(7);
 
@@ -111,7 +113,7 @@ public class AuthenticationService {
 
                 User user = validateAndGetUserFromRefreshToken(request);
                 redisTokenService.remove(user.getUsername());
-                cookieUtil.clear(response, "refreshToken");
+                cookieUtil.clear(response, REFRESH_TOKEN_COOKIE_NAME);
 
             } catch (Exception e) {
                 // Có thể token đã hết hạn hoặc không hợp lệ, không cần làm gì thêm
@@ -186,7 +188,7 @@ public class AuthenticationService {
     }
 
     private User validateAndGetUserFromRefreshToken(HttpServletRequest request) {
-        String refreshToken = cookieUtil.get(request, "refreshToken").orElseThrow(() -> new InvalidDataException("Refresh token not found or invalid"));
+        String refreshToken = cookieUtil.get(request, REFRESH_TOKEN_COOKIE_NAME).orElseThrow(() -> new InvalidDataException("Refresh token not found or invalid"));
         String username = jwtService.extractUsername(refreshToken, TokenType.REFRESH_TOKEN);
         jwtService.isTokenExpired(refreshToken, TokenType.REFRESH_TOKEN);
         String tokenInRedis = redisTokenService.get(username).getRefreshToken();
@@ -196,3 +198,5 @@ public class AuthenticationService {
         return userService.getByUsername(username);
     }
 }
+
+

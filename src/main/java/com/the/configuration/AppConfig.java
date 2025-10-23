@@ -1,6 +1,8 @@
 package com.the.configuration;
 
 import com.the.service.UserService;
+import com.the.util.PathConst;
+import com.the.util.RoleConst;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -36,14 +38,14 @@ public class AppConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(request -> request
-                        .requestMatchers("/auth/change-password", "/auth/log-out").authenticated()
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/common/resend-link").hasAnyAuthority("ADMIN", "MANAGER")
-                        .requestMatchers("/user/list", "/user/search").hasAnyAuthority("ADMIN", "MANAGER")
-                        .requestMatchers(HttpMethod.POST, "/user/").hasAnyAuthority("ADMIN", "MANAGER")
-                        .requestMatchers(HttpMethod.PUT, "/user/*").authenticated()
-                        .requestMatchers(HttpMethod.DELETE, "/user/*").hasAnyAuthority("ADMIN", "MANAGER")
-                        .requestMatchers(HttpMethod.GET, "/user/*").authenticated()
+                        .requestMatchers(PathConst.AUTH_CHANGE_PASSWORD, PathConst.AUTH_LOG_OUT).authenticated()
+                        .requestMatchers(PathConst.AUTH_ALL).permitAll()
+                        .requestMatchers(PathConst.COMMON_RESEND_LINK).hasAnyAuthority(RoleConst.ADMIN, RoleConst.MANAGER)
+                        .requestMatchers(PathConst.USER_LIST, PathConst.USER_SEARCH).hasAnyAuthority(RoleConst.ADMIN, RoleConst.MANAGER)
+                        .requestMatchers(HttpMethod.POST, PathConst.USER_HOME).hasAnyAuthority(RoleConst.ADMIN, RoleConst.MANAGER)
+                        .requestMatchers(HttpMethod.PUT, PathConst.USER_HOME).authenticated()
+                        .requestMatchers(HttpMethod.DELETE, PathConst.USER_HOME).hasAnyAuthority(RoleConst.ADMIN, RoleConst.MANAGER)
+                        .requestMatchers(HttpMethod.GET, PathConst.USER_HOME).authenticated()
                         .anyRequest().authenticated())
                 .sessionManagement(manager -> manager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider()).addFilterBefore(preFilter, UsernamePasswordAuthenticationFilter.class);
@@ -52,7 +54,7 @@ public class AppConfig {
 
     @Bean
     public WebSecurityCustomizer ignoreResources() {
-        return (webSecurity) -> webSecurity
+        return webSecurity -> webSecurity
                 .ignoring()
                 .requestMatchers("/actuator/**", "/v3/**", "/webjars/**", "/swagger-ui*/*swagger-initializer.js", "/swagger-ui*/**");
     }

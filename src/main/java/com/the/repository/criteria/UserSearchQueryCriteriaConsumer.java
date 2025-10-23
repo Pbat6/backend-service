@@ -79,11 +79,6 @@ public class UserSearchQueryCriteriaConsumer implements Consumer<SearchCriteria>
                 }
                 break;
 
-            // Có thể thêm các case khác ở đây: not equal, in, ...
-            // case "!=":
-            //     predicate = builder.and(predicate, builder.notEqual(r.get(param.getKey()), value));
-            //     break;
-
             default:
                 // Không làm gì hoặc throw exception nếu toán tử không hợp lệ
                 break;

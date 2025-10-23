@@ -10,7 +10,7 @@ springdoc:
     enabled: true
 openapi:
   service:
-    api-docs: user-service
+    api-docs: backend-service
     server: ${API_URL:DUMMY-API-URL}
     title: API Document
     version: 1.0.0

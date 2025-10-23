@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
-      POSTGRES_DB: user_service_db
+      POSTGRES_DB: backend-service
       PGDATA: /data/postgres
     volumes:
       - postgres:/data/postgres
@@ -69,17 +69,83 @@ services:
 #      kafka-topics --create --partitions 3 --bootstrap-server kafka:9092 --topic input
 #      kafka-topics --create --bootstrap-server kafka:9092 --partitions 1 --topic output
 
-#  user-service:
-#    container_name: user-service
-#    build:
-#      context: ./
-#      dockerfile: Dockerfile
-#    env_file:
-#      - .env
-#    ports:
-#      - '8080:8080'
-#    networks:
-#      - backend
+  backend-service:
+    container_name: backend-service
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - '8080:8080'
+    networks:
+      - backend
+
+  elastic-search:
+    image: elasticsearch:7.14.1
+    container_name: elasticsearch
+    restart: always
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+    networks:
+      - backend
+
+  kibana:
+    image: kibana:7.14.1
+    container_name: kibana
+    restart: always
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elastic-search:9200
+    networks:
+      - backend
+
+  logstash:
+    image: logstash:7.14.1
+    container_name: logstash
+    restart: always
+    ports:
+      - "5600:5600"
+      - "5044:5044"
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    environment:
+      - XPACK_MONITORING_ELASTICSEARCH_HOSTS=http://elastic-search:9200
+      - XPACK_MONITORING_ENABLED=true
+    networks:
+      - backend
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    restart: unless-stopped
+    environment: # account: admin/admin
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    links:
+      - prometheus
+    volumes:
+      - grafana:/var/lib/grafana
+    networks:
+      - backend
 
 networks:
   backend:
@@ -87,3 +153,4 @@ networks:
 
 volumes:
   postgres:
+  grafana:

@@ -3,15 +3,12 @@ package com.the.repository;
 import com.the.dto.response.UserDetailResponse;
 import com.the.exception.InvalidDataException;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.Query;
 import jakarta.persistence.criteria.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import com.the.dto.response.PageResponse;
@@ -25,8 +22,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.the.util.AppConst.SEARCH_OPERATOR;
-import static com.the.util.AppConst.SORT_BY;
+import static com.the.util.SearchConst.SEARCH_OPERATOR;
+import static com.the.util.SearchConst.SORT_BY;
 
 @Component
 @Slf4j

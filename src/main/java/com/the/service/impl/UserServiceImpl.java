@@ -36,11 +36,10 @@ import com.the.util.UserType;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.the.util.AppConst.SORT_BY;
+import static com.the.util.SearchConst.SORT_BY;
 
 @Service
 @Slf4j

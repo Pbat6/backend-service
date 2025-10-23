@@ -1,7 +1,7 @@
 # Build output
 /target/
 /out/
-/api-service.jar
+/backend-service.jar
 
 # Compiled class files
 *.class

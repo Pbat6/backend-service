@@ -15,7 +15,7 @@ public class TokenResponse implements Serializable {
 
     private Long userId;
 
-    List<String> roles;
+    private List<String> roles;
 
     // more over
 }
