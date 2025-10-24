@@ -13,6 +13,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
@@ -29,6 +30,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Profile("!prod")
 @EnableWebSecurity
 @RequiredArgsConstructor
+@EnableMethodSecurity
 public class AppConfig {
 
     private final PreFilter preFilter;
@@ -38,14 +40,7 @@ public class AppConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(request -> request
-                        .requestMatchers(PathConst.AUTH_CHANGE_PASSWORD, PathConst.AUTH_LOG_OUT).authenticated()
                         .requestMatchers(PathConst.AUTH_ALL).permitAll()
-                        .requestMatchers(PathConst.COMMON_RESEND_LINK).hasAnyAuthority(RoleConst.ADMIN, RoleConst.MANAGER)
-                        .requestMatchers(PathConst.USER_LIST, PathConst.USER_SEARCH).hasAnyAuthority(RoleConst.ADMIN, RoleConst.MANAGER)
-                        .requestMatchers(HttpMethod.POST, PathConst.USER_HOME).hasAnyAuthority(RoleConst.ADMIN, RoleConst.MANAGER)
-                        .requestMatchers(HttpMethod.PUT, PathConst.USER_HOME).authenticated()
-                        .requestMatchers(HttpMethod.DELETE, PathConst.USER_HOME).hasAnyAuthority(RoleConst.ADMIN, RoleConst.MANAGER)
-                        .requestMatchers(HttpMethod.GET, PathConst.USER_HOME).authenticated()
                         .anyRequest().authenticated())
                 .sessionManagement(manager -> manager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider()).addFilterBefore(preFilter, UsernamePasswordAuthenticationFilter.class);

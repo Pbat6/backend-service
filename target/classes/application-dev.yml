@@ -11,7 +11,7 @@ spring:
   jpa:
     show-sql: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
   redis:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
@@ -28,7 +28,7 @@ springdoc:
     enabled: true
 openapi:
   service:
-    api-docs: user-service
+    api-docs: backend-service
     server: http://localhost:${server.port}
     title: API Document
     version: 1.0.0

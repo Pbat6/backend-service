@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +31,7 @@ public class UserController {
 
     @Operation(method = "POST", summary = "Add new user", description = "Send a request via this API to create new user")
     @PostMapping(value = "/")
+    @PreAuthorize("hasAuthority('user:create')")
     public ResponseData<Long> addUser(@Valid @RequestBody SignUpDTO user) {
         log.info("Request add user, {} {}", user.getFirstName(), user.getLastName());
         User actor = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -40,6 +42,7 @@ public class UserController {
 
     @Operation(summary = "Update user", description = "Send a request via this API to update user")
     @PutMapping("/{userId}")
+    @PreAuthorize("hasAuthority('user:update') or #userId == authentication.principal.id")
     public ResponseData<?> updateUser(@PathVariable @Min(1) long userId, @Valid @RequestBody UpdateUserDTO user) {
         log.info("Request update userId={}", userId);
         User actor = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -49,6 +52,7 @@ public class UserController {
 
     @Operation(summary = "Delete user permanently", description = "Send a request via this API to delete user permanently")
     @DeleteMapping("/{userId}")
+    @PreAuthorize("hasAuthority('user:delete')")
     public ResponseData<?> deleteUser(@PathVariable @Min(value = 1, message = "userId must be greater than 0") int userId) {
         log.info("Request delete userId={}", userId);
         User actor = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -59,6 +63,7 @@ public class UserController {
 
     @Operation(summary = "Get user detail", description = "Send a request via this API to get user information")
     @GetMapping("/{userId}")
+    @PreAuthorize("hasAuthority('user:view') or #userId == authentication.principal.id")
     public ResponseData<UserDetailResponse> getUser(@PathVariable @Min(1) long userId) {
         log.info("Request get user detail, userId={}", userId);
         User actor = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -67,6 +72,7 @@ public class UserController {
 
     @Operation(summary = "Get list of users per pageNo", description = "Send a request via this API to get user list by pageNo and pageSize")
     @GetMapping("/list")
+    @PreAuthorize("hasAuthority('user:view')")
     public ResponseData<?> getAllUsers(@RequestParam(defaultValue = "0", required = false) int pageNo,
                                        @Min(10) @RequestParam(defaultValue = "20", required = false) int pageSize,
                                        @RequestParam(required = false) String sortBy) {
@@ -77,6 +83,7 @@ public class UserController {
 
     @Operation(summary = "Advance search query by criteria", description = "Send a request via this API to get user list by pageNo, pageSize and sort by multiple column")
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('user:view')")
     public ResponseData<?> advanceSearchWithCriteria(@RequestParam(defaultValue = "0", required = false) int pageNo,
                                                      @Min(10) @RequestParam(defaultValue = "20", required = false) int pageSize,
                                                      @RequestParam(required = false) String sortBy,

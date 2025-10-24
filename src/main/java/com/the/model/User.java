@@ -66,9 +66,17 @@ public class User extends AbstractEntity<Long> implements UserDetails {
     @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     private Set<UserHasRole> roles = new HashSet<>();
 
+    @JsonIgnore
+    @OneToMany(
+            mappedBy = "user",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private Set<UserHasCourse> enrollments = new HashSet<>();
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return roles.stream().map(u -> new SimpleGrantedAuthority(u.getRole().getName())).toList();
+        return roles.stream().flatMap(uhr -> uhr.getRole().getPermissions().stream()).map(rhp -> new SimpleGrantedAuthority(rhp.getPermission().getName())).toList();
     }
 
     @Override
