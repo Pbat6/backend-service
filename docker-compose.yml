@@ -3,14 +3,16 @@ services:
     image: postgres:15
     container_name: postgres
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
-      POSTGRES_DB: backend-service
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
       PGDATA: /data/postgres
     volumes:
       - postgres:/data/postgres
-    ports:
+    ports: # Không public database
       - '5432:5432'
     networks:
       - backend
@@ -19,10 +21,13 @@ services:
     image: redis:6.2-alpine
     container_name: redis
     hostname: redis
-    ports:
+    ports: # Không public cache
       - '6379:6379'
+    env_file:
+      - .env
     environment:
-      - ALLOW_EMPTY_PASSWORD=yes
+      - ALLOW_EMPTY_PASSWORD=no
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_DISABLE_COMMANDS=FLUSHDB;FLUSHALL
     networks:
       - backend
@@ -33,7 +38,7 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    ports:
+    ports: # Không public Zookeeper
       - '22181:2181'
     networks:
       - backend
@@ -43,31 +48,18 @@ services:
     container_name: kafka
     depends_on:
       - zookeeper
-    ports:
+    ports: # Không public Kafka
       - '29092:29092'
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      # Đã đơn giản hóa listeners, chỉ cần nội bộ
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     networks:
       - backend
-
-#  init-kafka-container:
-#    image: confluentinc/cp-kafka:latest
-#    depends_on:
-#      - kafka
-#    entrypoint: [ '/bin/sh', '-c' ]
-#    command: >
-#      # rather than giving sleep 15 use this
-#      # to block init container to wait for Kafka broker to be ready
-#      kafka-topics --bootstrap-server kafka:9092 --list
-#
-#      # create init topics
-#      kafka-topics --create --partitions 3 --bootstrap-server kafka:9092 --topic input
-#      kafka-topics --create --bootstrap-server kafka:9092 --partitions 1 --topic output
 
   backend-service:
     container_name: backend-service
@@ -76,17 +68,23 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env
-    ports:
-      - '8080:8080'
+#    ports: # Nginx sẽ quản lý
+#      - '8080:8080'
     networks:
       - backend
+    depends_on:
+      - postgres
+      - redis
+      - kafka
 
   elastic-search:
     image: elasticsearch:7.14.1
     container_name: elasticsearch
     restart: always
-    ports:
+    ports: # Không public Elastic
       - "9200:9200"
+    volumes: # Để lưu dữ liệu Elastic
+      - esdata:/usr/share/elasticsearch/data
     environment:
       - discovery.type=single-node
     networks:
@@ -96,18 +94,20 @@ services:
     image: kibana:7.14.1
     container_name: kibana
     restart: always
-    ports:
+    ports: # Nginx sẽ quản lý
       - "5601:5601"
     environment:
       - ELASTICSEARCH_HOSTS=http://elastic-search:9200
     networks:
       - backend
+    depends_on:
+      - elastic-search
 
   logstash:
     image: logstash:7.14.1
     container_name: logstash
     restart: always
-    ports:
+    ports: # Dịch vụ nội bộ
       - "5600:5600"
       - "5044:5044"
     volumes:
@@ -117,6 +117,8 @@ services:
       - XPACK_MONITORING_ENABLED=true
     networks:
       - backend
+    depends_on:
+      - elastic-search
 
   prometheus:
     image: prom/prometheus
@@ -126,7 +128,7 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
+    ports: # Grafana sẽ truy cập nội bộ
       - "9090:9090"
     networks:
       - backend
@@ -135,10 +137,12 @@ services:
     image: grafana/grafana
     container_name: grafana
     restart: unless-stopped
+    env_file:
+      - .env
     environment: # account: admin/admin
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    ports:
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
+    ports: # Nginx sẽ quản lý
       - "3000:3000"
     links:
       - prometheus
@@ -147,6 +151,23 @@ services:
     networks:
       - backend
 
+  nginx-proxy:
+    image: nginx:latest
+    container_name: nginx-proxy
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${NGINX_PUBLIC_PORT}:80" # CHỈ MỘT CỔNG NÀY ĐƯỢC PUBLIC
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - backend
+    depends_on:
+      - backend-service
+      - grafana
+      - kibana
+
 networks:
   backend:
     driver: bridge
@@ -154,3 +175,4 @@ networks:
 volumes:
   postgres:
   grafana:
+  esdata:

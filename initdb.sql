@@ -35,3 +35,6 @@ insert into tbl_role_has_permission (role_id, permission_id) values
 
 insert into tbl_user (username, password, status )
 values ('admin','$2a$12$iaFviHXffwJZt0M8uqUUQ.DN6RJ3/0jDgYrToS58U4Vtpu9cU/TDe', 'ACTIVE');
+
+insert into tbl_user_has_role (role_id, user_id)
+values (1, 1);

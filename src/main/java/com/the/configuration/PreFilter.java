@@ -47,11 +47,11 @@ public class PreFilter extends OncePerRequestFilter {
 
         final String accessToken = authorization.substring("Bearer ".length());
 
-        if (redisTokenService.isTokenBlacklisted(accessToken)) {
-            log.warn("Authentication failed: Token is blacklisted.");
-            filterChain.doFilter(request, response);
-            return;
-        }
+//        if (redisTokenService.isTokenBlacklisted(accessToken)) {
+//            log.warn("Authentication failed: Token is blacklisted.");
+//            filterChain.doFilter(request, response);
+//            return;
+//        }
 
         final String userName = jwtService.extractUsername(accessToken, TokenType.ACCESS_TOKEN);
 

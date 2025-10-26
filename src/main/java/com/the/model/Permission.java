@@ -26,5 +26,5 @@ public class Permission extends AbstractEntity<Integer> {
     private String description;
 
     @OneToMany(mappedBy = "permission")
-    private Set<RoleHasPermission> permissions = new HashSet<>();
+    private Set<RoleHasPermission> roles = new HashSet<>();
 }
